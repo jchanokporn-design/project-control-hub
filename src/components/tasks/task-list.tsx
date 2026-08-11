@@ -32,7 +32,7 @@ const STATUS_SORT_ORDER: Record<TaskStatus, number> = {
   cancelled: 4,
 };
 
-type SortKey = "due_date" | "status" | "progress_percent";
+type SortKey = "start_date" | "due_date" | "status" | "progress_percent";
 type SortDir = "asc" | "desc";
 
 function SortTh({
@@ -76,6 +76,7 @@ export function TaskList({
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [newTaskDue, setNewTaskDue] = useState("");
+  const [newTaskStart, setNewTaskStart] = useState("");
   const [newTaskRemark, setNewTaskRemark] = useState("");
   const [saving, setSaving] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -113,6 +114,7 @@ export function TaskList({
         project_id: projectId,
         name: newTaskName,
         assignee_id: newTaskAssignee || null,
+        start_date: newTaskStart || null,
         due_date: newTaskDue || null,
         remark: newTaskRemark || null,
       })
@@ -123,6 +125,7 @@ export function TaskList({
       setTasks((prev) => [...prev, data]);
       setNewTaskName("");
       setNewTaskAssignee("");
+      setNewTaskStart("");
       setNewTaskDue("");
       setNewTaskRemark("");
       setShowAddForm(false);
@@ -161,7 +164,10 @@ export function TaskList({
     const dir = sortDir === "asc" ? 1 : -1;
     return [...tasks].sort((a, b) => {
       let av: number, bv: number;
-      if (sortKey === "due_date") {
+      if (sortKey === "start_date") {
+        av = a.start_date ? new Date(a.start_date).getTime() : Infinity;
+        bv = b.start_date ? new Date(b.start_date).getTime() : Infinity;
+      } else if (sortKey === "due_date") {
         // Tasks with no due date always sort to the end, regardless of direction.
         av = a.due_date ? new Date(a.due_date).getTime() : Infinity;
         bv = b.due_date ? new Date(b.due_date).getTime() : Infinity;
@@ -197,6 +203,7 @@ export function TaskList({
             <tr>
               <th className="px-3 py-2">Task</th>
               <th className="px-3 py-2">Assignee</th>
+              <SortTh label="Start" active={sortKey === "start_date"} dir={sortDir} onClick={() => toggleSort("start_date")} />
               <SortTh label="Due" active={sortKey === "due_date"} dir={sortDir} onClick={() => toggleSort("due_date")} />
               <SortTh label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} />
               <SortTh label="Progress" active={sortKey === "progress_percent"} dir={sortDir} onClick={() => toggleSort("progress_percent")} />
@@ -243,6 +250,19 @@ export function TaskList({
                       </select>
                     ) : (
                       <span>{task.assignee_id ? memberById[task.assignee_id]?.name ?? "—" : "—"}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-slate-600">
+                    {editable ? (
+                      <input
+                        disabled={saving}
+                        type="date"
+                        value={task.start_date ?? ""}
+                        onChange={(e) => updateTask(task.id, { start_date: e.target.value || null })}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      <span>{task.start_date ?? "—"}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-slate-600">
@@ -324,7 +344,7 @@ export function TaskList({
             })}
             {tasks.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                   ยังไม่มี Task
                 </td>
               </tr>
@@ -367,6 +387,14 @@ export function TaskList({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Start date</label>
+                  <Input
+                    type="date"
+                    value={newTaskStart}
+                    onChange={(e) => setNewTaskStart(e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Due date</label>

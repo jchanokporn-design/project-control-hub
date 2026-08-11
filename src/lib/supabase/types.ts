@@ -68,6 +68,13 @@ export interface Task {
   updated_at: string;
 }
 
+export interface TaskDependency {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  type: string;
+}
+
 // Minimal Database type so `createBrowserClient<Database>` / `createServerClient<Database>`
 // type-check. Extend the `Row`/`Insert`/`Update` shapes as Phase 2+ tables come online.
 export interface Database {

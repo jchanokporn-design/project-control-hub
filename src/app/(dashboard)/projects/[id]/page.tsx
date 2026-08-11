@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Badge, PROJECT_HEALTH_TONE, PROJECT_HEALTH_LABEL } from "@/components/ui/badge";
 import { TaskList } from "@/components/tasks/task-list";
+import { ProjectTabs } from "@/components/projects/project-tabs";
+import { BudgetCard } from "@/components/projects/budget-card";
 
 export default async function ProjectDetailPage({
   params,
@@ -51,17 +53,19 @@ export default async function ProjectDetailPage({
         </div>
       </div>
 
+      <ProjectTabs projectId={id} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="p-4">
           <p className="text-xs text-slate-500">Progress (calculated)</p>
           <p className="mt-1 text-2xl font-semibold">{project.progress_calculated}%</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-xs text-slate-500">Budget Planned / Actual</p>
-          <p className="mt-1 text-lg font-semibold">
-            {project.budget_planned.toLocaleString()} / {project.budget_actual.toLocaleString()}
-          </p>
-        </Card>
+        <BudgetCard
+          projectId={id}
+          budgetPlanned={project.budget_planned}
+          budgetActual={project.budget_actual}
+          canManage={isAdmin || isPm}
+        />
         <Card className="p-4">
           <p className="text-xs text-slate-500">Timeline</p>
           <p className="mt-1 text-sm font-medium">
