@@ -5,6 +5,7 @@ import { Badge, PROJECT_HEALTH_TONE, PROJECT_HEALTH_LABEL } from "@/components/u
 import { TaskList } from "@/components/tasks/task-list";
 import { ProjectTabs } from "@/components/projects/project-tabs";
 import { BudgetCard } from "@/components/projects/budget-card";
+import { ProjectMembers } from "@/components/projects/project-members";
 
 export default async function ProjectDetailPage({
   params,
@@ -28,10 +29,16 @@ export default async function ProjectDetailPage({
 
   const { data: members } = await supabase
     .from("project_members")
-    .select("user_id, role_in_project, users ( id, name, email )")
+    .select("id, user_id, role_in_project, users ( id, name, email )")
     .eq("project_id", id);
 
   const isPm = members?.some((m) => m.user_id === user.id && m.role_in_project === "pm") ?? false;
+
+  const { data: allUsers } = await supabase
+    .from("users")
+    .select("id, name, email")
+    .eq("is_active", true)
+    .order("name");
 
   const { data: tasks } = await supabase
     .from("tasks")
@@ -86,6 +93,26 @@ export default async function ProjectDetailPage({
           </div>
         </Card>
       )}
+
+      <ProjectMembers
+        projectId={id}
+        initialMembers={(members ?? [])
+          .map((m) => {
+            const u = Array.isArray(m.users) ? m.users[0] : m.users;
+            return u
+              ? {
+                  membershipId: m.id,
+                  userId: m.user_id,
+                  name: u.name,
+                  email: u.email,
+                  roleInProject: m.role_in_project as "pm" | "member" | "viewer",
+                }
+              : null;
+          })
+          .filter((m): m is NonNullable<typeof m> => !!m)}
+        allUsers={allUsers ?? []}
+        canManage={isAdmin || isPm}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Tasks</h2>

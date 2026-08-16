@@ -52,6 +52,8 @@ export interface Task {
   id: string;
   project_id: string;
   work_package_id: string | null;
+  parent_task_id: string | null;
+  weight: number;
   name: string;
   assignee_id: string | null;
   start_date: string | null;
