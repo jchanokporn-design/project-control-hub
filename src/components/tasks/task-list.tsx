@@ -75,6 +75,19 @@ export function TaskList({
   canDelete: boolean; // Admin only — matches the tasks_delete RLS policy
 }) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+
+  // router.refresh() re-fetches server data and passes a new `initialTasks`
+  // prop down, but useState only reads its initial value once on mount —
+  // without reconciling here, values that only change via DB triggers (like
+  // a parent task's auto-rolled-up progress from its sub-tasks) never show
+  // up in the UI until a full page reload. This is React's recommended
+  // "adjust state during render" pattern rather than a useEffect, since it
+  // avoids an extra render pass.
+  const [prevInitialTasks, setPrevInitialTasks] = useState(initialTasks);
+  if (initialTasks !== prevInitialTasks) {
+    setPrevInitialTasks(initialTasks);
+    setTasks(initialTasks);
+  }
   const router = useRouter();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
@@ -87,6 +100,7 @@ export function TaskList({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editRemark, setEditRemark] = useState("");
+  const [editWeight, setEditWeight] = useState("1");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Sub-task add form (1 level deep only — the "+ Sub-task" action never
@@ -94,6 +108,7 @@ export function TaskList({
   const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null);
   const [newSubName, setNewSubName] = useState("");
   const [newSubAssignee, setNewSubAssignee] = useState("");
+  const [newSubStart, setNewSubStart] = useState("");
   const [newSubDue, setNewSubDue] = useState("");
   const [newSubWeight, setNewSubWeight] = useState("1");
 
@@ -166,6 +181,7 @@ export function TaskList({
         parent_task_id: parentId,
         name: newSubName,
         assignee_id: newSubAssignee || null,
+        start_date: newSubStart || null,
         due_date: newSubDue || null,
         weight: Number(newSubWeight) || 1,
       })
@@ -176,6 +192,7 @@ export function TaskList({
       setTasks((prev) => [...prev, data]);
       setNewSubName("");
       setNewSubAssignee("");
+      setNewSubStart("");
       setNewSubDue("");
       setNewSubWeight("1");
       setAddingSubtaskFor(null);
@@ -249,11 +266,18 @@ export function TaskList({
   function openEdit(task: Task) {
     setEditingTaskId(task.id);
     setEditRemark(task.remark ?? "");
+    setEditWeight(String(task.weight ?? 1));
   }
 
   async function saveRemark() {
-    if (!editingTaskId) return;
-    await updateTask(editingTaskId, { remark: editRemark || null });
+    if (!editingTaskId || !editingTask) return;
+    const patch: Partial<Task> = { remark: editRemark || null };
+    // Weight only matters for sub-tasks (it's what feeds the parent's
+    // weighted-average rollup) — only send it if this row is a sub-task.
+    if (editingTask.parent_task_id) {
+      patch.weight = Number(editWeight) || 1;
+    }
+    await updateTask(editingTaskId, patch);
     setEditingTaskId(null);
   }
 
@@ -291,6 +315,11 @@ export function TaskList({
                         >
                           {task.name}
                         </button>
+                        {isSub && task.weight !== 1 && (
+                          <span className="text-[10px] text-slate-400" title="Weight">
+                            (weight {task.weight})
+                          </span>
+                        )}
                         {task.is_milestone && (
                           <Badge tone="blue" className="ml-1">
                             Milestone
@@ -454,6 +483,10 @@ export function TaskList({
                             </select>
                           </div>
                           <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Start date</label>
+                            <Input type="date" value={newSubStart} onChange={(e) => setNewSubStart(e.target.value)} />
+                          </div>
+                          <div>
                             <label className="mb-1 block text-xs font-medium text-slate-600">Due date</label>
                             <Input type="date" value={newSubDue} onChange={(e) => setNewSubDue(e.target.value)} />
                           </div>
@@ -583,10 +616,25 @@ export function TaskList({
               value={editRemark}
               onChange={(e) => setEditRemark(e.target.value)}
               rows={4}
-              className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               placeholder="รายละเอียดงาน / หมายเหตุ"
             />
-            <div className="flex items-center justify-between">
+            {editingTask.parent_task_id && (
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Weight <span className="text-slate-400">(น้ำหนักถ่วง เทียบกับ Sub-task พี่น้อง — ค่ามาก = มีผลต่อ % ของ Task แม่มากกว่า)</span>
+                </label>
+                <Input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={editWeight}
+                  onChange={(e) => setEditWeight(e.target.value)}
+                  className="w-24"
+                />
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-between">
               {canDelete ? (
                 <button
                   type="button"
