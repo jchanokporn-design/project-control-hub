@@ -14,14 +14,36 @@ const BAR_COLOR: Record<TaskStatus, string> = {
   cancelled: "bg-slate-200",
 };
 
+const LEGEND_ITEMS: { label: string; swatch: string; isDiamond?: boolean }[] = [
+  { label: "Not Started", swatch: "bg-slate-300" },
+  { label: "In Progress", swatch: "bg-blue-500" },
+  { label: "Blocked", swatch: "bg-red-400" },
+  { label: "Completed", swatch: "bg-emerald-500" },
+  { label: "Cancelled", swatch: "bg-slate-200" },
+  { label: "Milestone", swatch: "bg-orange-500", isDiamond: true },
+];
+
 type Zoom = "day" | "week" | "month";
 const PX_PER_DAY: Record<Zoom, number> = { day: 34, week: 13, month: 4.5 };
+
+// Fixed row height for non-wrapped rows; wrapped 2-line names get a taller
+// row (ROW_HEIGHT_TALL) so the Gantt bar stays vertically centered next to
+// whatever the label column ends up doing.
+const ROW_HEIGHT = 44; // px, matches h-11
+const ROW_HEIGHT_TALL = 56; // px, for names that wrap to 2 lines
 
 function toDate(s: string) {
   return new Date(s + "T00:00:00");
 }
 function diffDays(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+// Rough heuristic for "will this name need 2 lines in a ~150px column at
+// ~11px font": long names (or with spaces past a threshold) wrap; short
+// ones don't. Good enough without measuring actual rendered text width.
+function needsTwoLines(name: string) {
+  return name.length > 22;
 }
 
 export function GanttChart({
@@ -40,6 +62,7 @@ export function GanttChart({
   const [zoom, setZoom] = useState<Zoom>("week");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const dated = tasks.filter((t) => t.start_date && t.due_date);
 
@@ -87,6 +110,36 @@ export function GanttChart({
     const predecessor = tasks.find((t) => t.id === dep.depends_on_task_id);
     return predecessor ? predecessor.name : null;
   }
+
+  function childrenOf(taskId: string) {
+    return tasks.filter((t) => t.parent_task_id === taskId);
+  }
+
+  function toggleCollapsed(taskId: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  // Build the flat display list: top-level tasks in original order, each
+  // immediately followed by its sub-tasks (indented) unless collapsed.
+  const displayRows = useMemo(() => {
+    const topLevel = tasks.filter((t) => !t.parent_task_id);
+    const rows: { task: Task; isSub: boolean; rowHeight: number }[] = [];
+    topLevel.forEach((t) => {
+      rows.push({ task: t, isSub: false, rowHeight: needsTwoLines(t.name) ? ROW_HEIGHT_TALL : ROW_HEIGHT });
+      if (!collapsed.has(t.id)) {
+        childrenOf(t.id).forEach((c) => {
+          rows.push({ task: c, isSub: true, rowHeight: needsTwoLines(c.name) ? ROW_HEIGHT_TALL : ROW_HEIGHT });
+        });
+      }
+    });
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, collapsed]);
 
   const editingTask = tasks.find((t) => t.id === editingId) ?? null;
 
@@ -138,7 +191,7 @@ export function GanttChart({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
           {canManage
             ? "คลิกที่แถวเพื่อแก้ไขวันที่ / Dependency / Milestone"
@@ -159,6 +212,20 @@ export function GanttChart({
         </div>
       </div>
 
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2">
+        {LEGEND_ITEMS.map((item) => (
+          <div key={item.label} className="flex items-center gap-1.5">
+            <span
+              className={`inline-block h-2.5 w-2.5 flex-shrink-0 ${item.swatch} ${
+                item.isDiamond ? "rotate-45 rounded-[2px]" : "rounded-sm"
+              }`}
+            />
+            <span className="text-xs text-slate-500">{item.label}</span>
+          </div>
+        ))}
+      </div>
+
       {tasks.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
           ยังไม่มี Task ในโครงการนี้ — ไปที่แท็บ Overview เพื่อเพิ่ม Task ก่อน
@@ -171,62 +238,86 @@ export function GanttChart({
               (แถบเส้นเวลาจะขึ้นหลังใส่วันที่ครบ)
             </div>
           )}
-          <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {/* max-h + overflow-y-auto gives us a scroll container so the
+              sticky header (top-0) actually has something to stick within;
+              without a bounded/scrolling ancestor `sticky` has no effect. */}
+          <div className="flex max-h-[70vh] overflow-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white">
           {/* Fixed label column */}
-          <div className="w-44 flex-shrink-0 border-r border-slate-200">
-            <div className="h-9 border-b border-slate-200 bg-slate-50" />
-            {tasks.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => canManage && setEditingId(t.id)}
-                className="flex h-11 w-full items-center border-b border-slate-100 px-3 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
-                title={depLabel(t.id) ? `หลังจาก: ${depLabel(t.id)}` : undefined}
-              >
-                <span className="truncate">{t.name}</span>
-                {!(t.start_date && t.due_date) && (
-                  <span className="ml-1 flex-shrink-0 text-amber-500" title="ยังไม่ระบุวันที่">
-                    ●
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="w-44 flex-shrink-0 border-r border-slate-200 sm:w-56">
+            <div className="sticky top-0 z-20 h-9 border-b border-slate-200 bg-slate-50" />
+            {displayRows.map(({ task: t, isSub, rowHeight }) => {
+              const hasChildren = !isSub && childrenOf(t.id).length > 0;
+              const isCollapsed = collapsed.has(t.id);
+              return (
+                <div
+                  key={t.id}
+                  style={{ height: rowHeight }}
+                  className={`flex items-center gap-1 border-b border-slate-100 px-2 ${isSub ? "pl-6" : ""}`}
+                >
+                  {hasChildren && (
+                    <button
+                      type="button"
+                      onClick={() => toggleCollapsed(t.id)}
+                      className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      title={isCollapsed ? "ขยาย" : "ยุบ"}
+                    >
+                      {isCollapsed ? "▸" : "▾"}
+                    </button>
+                  )}
+                  {isSub && <span className="flex-shrink-0 text-slate-300">↳</span>}
+                  <button
+                    onClick={() => canManage && setEditingId(t.id)}
+                    title={depLabel(t.id) ? `${t.name} — หลังจาก: ${depLabel(t.id)}` : t.name}
+                    className={`min-w-0 flex-1 text-left text-xs font-medium leading-tight ${
+                      isSub ? "text-slate-600" : "text-slate-700"
+                    } line-clamp-2 hover:underline`}
+                  >
+                    {t.name}
+                  </button>
+                  {!(t.start_date && t.due_date) && (
+                    <span className="flex-shrink-0 text-amber-500" title="ยังไม่ระบุวันที่">
+                      ●
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Scrollable chart area */}
           <div className="flex-1 overflow-x-auto">
             <div style={{ width: totalWidth, position: "relative" }}>
               {/* Ruler header */}
-              <div className="relative h-9 border-b border-slate-200 bg-slate-50">
-                {markers.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`absolute top-0 h-full border-l ${
-                      m.strong ? "border-slate-300" : "border-slate-100"
-                    }`}
-                    style={{ left: m.leftPx }}
-                  >
-                    <span
-                      className={`ml-1 text-[10px] ${m.strong ? "font-semibold text-slate-600" : "text-slate-400"}`}
+              <div className="sticky top-0 z-10 h-9 border-b border-slate-200 bg-slate-50">
+                <div className="relative h-full">
+                  {markers.map((m, i) => (
+                    <div
+                      key={i}
+                      className={`absolute top-0 h-full border-l ${
+                        m.strong ? "border-slate-300" : "border-slate-100"
+                      }`}
+                      style={{ left: m.leftPx }}
                     >
-                      {m.label}
-                    </span>
-                  </div>
-                ))}
+                      <span
+                        className={`ml-1 text-[10px] ${m.strong ? "font-semibold text-slate-600" : "text-slate-400"}`}
+                      >
+                        {m.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Rows */}
-              {tasks.map((t) => {
+              {displayRows.map(({ task: t, rowHeight }) => {
                 const hasDates = t.start_date && t.due_date;
                 const startOffset = hasDates ? diffDays(rangeStart, toDate(t.start_date!)) : 0;
                 const span = hasDates
                   ? Math.max(diffDays(toDate(t.start_date!), toDate(t.due_date!)) + 1, 1)
                   : 0;
+                const barTop = rowHeight / 2 - 12; // vertically center the 24px-tall bar
                 return (
-                  <div
-                    key={t.id}
-                    className="relative h-11 border-b border-slate-100"
-                    style={{ backgroundImage: "none" }}
-                  >
+                  <div key={t.id} style={{ height: rowHeight }} className="relative border-b border-slate-100">
                     {markers.map((m, i) => (
                       <div
                         key={i}
@@ -239,8 +330,8 @@ export function GanttChart({
                     {hasDates && !t.is_milestone && (
                       <button
                         onClick={() => canManage && setEditingId(t.id)}
-                        className={`absolute top-2.5 h-6 rounded ${BAR_COLOR[t.status]} flex items-center px-2 text-[10px] font-medium text-white shadow-sm`}
-                        style={{ left: startOffset * pxPerDay, width: Math.max(span * pxPerDay, 10) }}
+                        className={`absolute h-6 rounded ${BAR_COLOR[t.status]} flex items-center px-2 text-[10px] font-medium text-white shadow-sm`}
+                        style={{ left: startOffset * pxPerDay, width: Math.max(span * pxPerDay, 10), top: barTop }}
                         title={`${t.name}: ${t.start_date} → ${t.due_date} (${t.progress_percent}%)`}
                       >
                         {span * pxPerDay > 40 ? `${t.progress_percent}%` : ""}
@@ -249,15 +340,16 @@ export function GanttChart({
                     {hasDates && t.is_milestone && (
                       <button
                         onClick={() => canManage && setEditingId(t.id)}
-                        className="absolute top-2.5 h-6 w-6 rotate-45 rounded-sm bg-orange-500 shadow-sm"
-                        style={{ left: startOffset * pxPerDay + span * pxPerDay - 12 }}
+                        className="absolute h-6 w-6 rotate-45 rounded-sm bg-orange-500 shadow-sm"
+                        style={{ left: startOffset * pxPerDay + span * pxPerDay - 12, top: barTop }}
                         title={`Milestone: ${t.name} (${t.due_date})${t.is_payment_milestone ? " · Payment" : ""}`}
                       />
                     )}
                     {!hasDates && (
                       <button
                         onClick={() => canManage && setEditingId(t.id)}
-                        className="absolute top-2.5 left-2 text-[10px] italic text-slate-300 hover:text-slate-400"
+                        className="absolute left-2 text-[10px] italic text-slate-300 hover:text-slate-400"
+                        style={{ top: barTop + 4 }}
                       >
                         ยังไม่ระบุวันที่ — คลิกเพื่อเพิ่ม
                       </button>
