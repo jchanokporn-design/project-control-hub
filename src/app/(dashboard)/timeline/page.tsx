@@ -11,13 +11,20 @@ export default async function PortfolioTimelinePage() {
 
   // RLS already restricts this to: all projects if admin, or only projects
   // the current user is a member of, otherwise — same rule as /projects.
-  const { data: projects } = await supabase
+  const { data: projectsRaw } = await supabase
     .from("projects")
-    .select("id, project_code, name, type, health, progress_calculated, start_date, end_date")
+    .select("id, project_code, name, health, progress_calculated, start_date, end_date, types ( name )")
     .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
-  const projectIds = (projects ?? []).map((p) => p.id);
+  const projects = (projectsRaw ?? []).map((p) => {
+    const t = Array.isArray(p.types) ? p.types[0] : p.types;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { types: _types, ...rest } = p;
+    return { ...rest, type: t?.name ?? "—" };
+  });
+
+  const projectIds = projects.map((p) => p.id);
 
   const { data: tasks } =
     projectIds.length > 0
@@ -34,7 +41,7 @@ export default async function PortfolioTimelinePage() {
         <p className="text-sm text-slate-500">มุมมองรวมทุกโครงการ — เลือกโครงการที่ต้องการดูเทียบกันบนแกนเวลาเดียว</p>
       </div>
 
-      <PortfolioGantt projects={projects ?? []} tasks={tasks ?? []} />
+      <PortfolioGantt projects={projects} tasks={tasks ?? []} />
     </div>
   );
 }

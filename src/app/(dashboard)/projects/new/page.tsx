@@ -16,9 +16,15 @@ export default async function NewProjectPage() {
     redirect("/projects");
   }
 
+  const { data: types } = await supabase
+    .from("types")
+    .select("id, name, code_prefix")
+    .eq("is_active", true)
+    .order("name");
+
   const { data: templates } = await supabase
     .from("project_templates")
-    .select("id, name, type")
+    .select("id, name, type_id")
     .order("name");
 
   const { data: users } = await supabase
@@ -27,10 +33,26 @@ export default async function NewProjectPage() {
     .eq("is_active", true)
     .order("name");
 
+  // For filtering the Project Manager dropdown by matching Type — see the
+  // design note in migration 0007 for how Type↔Project-type matching works.
+  const { data: typeAssignments } = await supabase
+    .from("user_type_assignments")
+    .select("user_id, type_id");
+
+  const userTypeMap: Record<string, string[]> = {};
+  (typeAssignments ?? []).forEach((a) => {
+    (userTypeMap[a.user_id] ??= []).push(a.type_id);
+  });
+
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="mb-4 text-xl font-semibold text-slate-900">New Project</h1>
-      <NewProjectForm templates={templates ?? []} users={users ?? []} />
+      <NewProjectForm
+        types={types ?? []}
+        templates={templates ?? []}
+        users={users ?? []}
+        userTypeMap={userTypeMap}
+      />
     </div>
   );
 }

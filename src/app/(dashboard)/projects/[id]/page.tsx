@@ -20,7 +20,11 @@ export default async function ProjectDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: project, error } = await supabase.from("projects").select("*").eq("id", id).single();
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select("*, types ( name )")
+    .eq("id", id)
+    .single();
 
   if (error || !project) notFound();
 
@@ -47,6 +51,8 @@ export default async function ProjectDetailPage({
     .order("start_date", { ascending: true, nullsFirst: false });
 
   const cf = (project.custom_fields ?? {}) as Record<string, unknown>;
+  const typeName = Array.isArray(project.types) ? project.types[0]?.name : project.types?.name;
+  const isConstruction = typeName?.toLowerCase() === "construction";
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,7 +87,7 @@ export default async function ProjectDetailPage({
         </Card>
       </div>
 
-      {project.type === "construction" && Boolean(cf.site || cf.contractor) && (
+      {isConstruction && Boolean(cf.site || cf.contractor) && (
         <Card className="p-4 text-sm">
           <p className="mb-2 text-xs font-medium text-slate-500">Construction Details</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

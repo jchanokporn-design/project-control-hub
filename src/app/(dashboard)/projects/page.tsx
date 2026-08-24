@@ -11,7 +11,7 @@ export default async function ProjectsPage() {
   // the current user is a member of, otherwise. No extra filtering needed here.
   const { data: projects, error } = await supabase
     .from("projects")
-    .select("id, project_code, name, type, health, progress_calculated, start_date, end_date")
+    .select("id, project_code, name, health, progress_calculated, start_date, end_date, types ( name )")
     .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
@@ -33,7 +33,10 @@ export default async function ProjectsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {projects?.map((p) => (
+        {projects?.map((p) => {
+          const typesField = p.types as unknown as { name: string } | { name: string }[] | null;
+          const typeName = Array.isArray(typesField) ? typesField[0]?.name : typesField?.name;
+          return (
           <Link key={p.id} href={`/projects/${p.id}`}>
             <Card className="h-full p-4 transition-shadow hover:shadow-md">
               <div className="flex items-start justify-between">
@@ -43,7 +46,7 @@ export default async function ProjectsPage() {
                 </Badge>
               </div>
               <h2 className="mt-1 font-medium text-slate-900">{p.name}</h2>
-              <p className="mt-0.5 text-xs uppercase text-slate-400">{p.type}</p>
+              <p className="mt-0.5 text-xs uppercase text-slate-400">{typeName ?? "—"}</p>
 
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-slate-500">
@@ -59,7 +62,8 @@ export default async function ProjectsPage() {
               </div>
             </Card>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

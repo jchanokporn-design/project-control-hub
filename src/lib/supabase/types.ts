@@ -3,7 +3,6 @@
 //   npx supabase gen types typescript --project-id <id> > src/lib/supabase/types.ts
 
 export type UserRole = "admin" | "member";
-export type ProjectType = "it" | "construction";
 export type ProjectHealth = "on_track" | "at_risk" | "delayed" | "on_hold" | "completed";
 export type TaskStatus = "not_started" | "in_progress" | "blocked" | "completed" | "cancelled";
 export type TaskPriority = "low" | "medium" | "high";
@@ -13,8 +12,19 @@ export interface AppUser {
   id: string;
   email: string;
   name: string;
+  employee_code: string | null;
   role: UserRole;
   capacity_hours_per_week: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+// The shared Type Master — drives Project type, Template type, and
+// User type tagging. See migration 0007.
+export interface AppType {
+  id: string;
+  name: string;
+  code_prefix: string;
   is_active: boolean;
   created_at: string;
 }
@@ -23,7 +33,7 @@ export interface Project {
   id: string;
   project_code: string;
   name: string;
-  type: ProjectType;
+  type_id: string;
   pm_id: string | null;
   sponsor: string | null;
   start_date: string | null;
@@ -75,6 +85,11 @@ export interface TaskDependency {
   task_id: string;
   depends_on_task_id: string;
   type: string;
+}
+
+export interface UserTypeAssignment {
+  user_id: string;
+  type_id: string;
 }
 
 // Minimal Database type so `createBrowserClient<Database>` / `createServerClient<Database>`
