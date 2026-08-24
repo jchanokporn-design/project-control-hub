@@ -238,10 +238,14 @@ export function GanttChart({
               (แถบเส้นเวลาจะขึ้นหลังใส่วันที่ครบ)
             </div>
           )}
-          {/* max-h + overflow-y-auto gives us a scroll container so the
-              sticky header (top-0) actually has something to stick within;
-              without a bounded/scrolling ancestor `sticky` has no effect. */}
-          <div className="flex max-h-[70vh] overflow-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white">
+          {/* Explicit overflow-x/overflow-y on BOTH containers is required here —
+              leaving overflow-y unset on an overflow-x-auto element makes browsers
+              compute overflow-y as auto too (per the CSS overflow spec), which
+              silently creates a second, independent vertical scrollbar inside the
+              chart area. That was desyncing the Task name column from the Gantt
+              bars. Only the outer container scrolls vertically; the inner one
+              only ever scrolls horizontally. */}
+          <div className="flex max-h-[70vh] overflow-x-hidden overflow-y-auto rounded-lg border border-slate-200 bg-white">
           {/* Fixed label column */}
           <div className="w-44 flex-shrink-0 border-r border-slate-200 sm:w-56">
             <div className="sticky top-0 z-20 h-9 border-b border-slate-200 bg-slate-50" />
@@ -285,7 +289,7 @@ export function GanttChart({
           </div>
 
           {/* Scrollable chart area */}
-          <div className="flex-1 overflow-x-auto">
+          <div className="flex-1 overflow-x-auto overflow-y-hidden">
             <div style={{ width: totalWidth, position: "relative" }}>
               {/* Ruler header */}
               <div className="sticky top-0 z-10 h-9 border-b border-slate-200 bg-slate-50">

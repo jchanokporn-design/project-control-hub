@@ -37,6 +37,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Link href="/my-work" className="hover:text-slate-900">
                 My Work
               </Link>
+              {profile?.role === "admin" && (
+                <Link href="/admin/users" className="hover:text-slate-900">
+                  Admin
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm text-slate-600">
