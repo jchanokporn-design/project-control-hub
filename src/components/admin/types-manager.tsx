@@ -68,11 +68,17 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
   async function saveEdit(id: string) {
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("types")
       .update({ name: editName.trim(), code_prefix: editPrefix.trim().toUpperCase() })
-      .eq("id", id);
-    if (!error) {
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      alert("แก้ไขไม่สำเร็จ: " + error.message);
+    } else if (!data || data.length === 0) {
+      alert("ไม่สามารถแก้ไขได้: ติดสิทธิ์ RLS หรือไม่มีสิทธิ์ Admin (กรุณารัน Migration 0008)");
+    } else {
       setTypes((prev) =>
         prev.map((t) =>
           t.id === id ? { ...t, name: editName.trim(), code_prefix: editPrefix.trim().toUpperCase() } : t
@@ -80,8 +86,6 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
       );
       setEditingId(null);
       router.refresh();
-    } else {
-      alert("แก้ไขไม่สำเร็จ: " + error.message);
     }
     setSaving(false);
   }
@@ -89,12 +93,19 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
   async function toggleActive(t: AppType) {
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase.from("types").update({ is_active: !t.is_active }).eq("id", t.id);
-    if (!error) {
+    const { data, error } = await supabase
+      .from("types")
+      .update({ is_active: !t.is_active })
+      .eq("id", t.id)
+      .select();
+
+    if (error) {
+      alert("แก้ไขไม่สำเร็จ: " + error.message);
+    } else if (!data || data.length === 0) {
+      alert("ไม่สามารถแก้ไขได้: ติดสิทธิ์ RLS หรือไม่มีสิทธิ์ Admin (กรุณารัน Migration 0008)");
+    } else {
       setTypes((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_active: !x.is_active } : x)));
       router.refresh();
-    } else {
-      alert("แก้ไขไม่สำเร็จ: " + error.message);
     }
     setSaving(false);
   }
@@ -109,12 +120,14 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
     if (!confirm(`ยืนยันลบ Type "${t.name}" — การลบนี้ย้อนกลับไม่ได้`)) return;
     setSaving(true);
     const supabase = createClient();
-    const { error } = await supabase.from("types").delete().eq("id", t.id);
-    if (!error) {
+    const { data, error } = await supabase.from("types").delete().eq("id", t.id).select();
+    if (error) {
+      alert("ลบไม่สำเร็จ: " + error.message);
+    } else if (!data || data.length === 0) {
+      alert("ไม่สามารถลบได้: ติดสิทธิ์ RLS หรือไม่มีสิทธิ์ Admin (กรุณารัน Migration 0008)");
+    } else {
       setTypes((prev) => prev.filter((x) => x.id !== t.id));
       router.refresh();
-    } else {
-      alert("ลบไม่สำเร็จ: " + error.message);
     }
     setSaving(false);
   }
@@ -171,7 +184,7 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
                       type="button"
                       disabled={saving}
                       onClick={() => handleDelete(t)}
-                      className="text-xs text-red-500 hover:text-red-700"
+                      className="text-xs text-rose-600 hover:text-rose-800"
                     >
                       ลบ
                     </button>
@@ -204,7 +217,7 @@ export function TypesManager({ initialTypes, usage }: { initialTypes: AppType[];
             เพิ่ม
           </Button>
         </form>
-        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
       </Card>
 
       <p className="text-xs text-slate-400">

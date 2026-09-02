@@ -30,7 +30,7 @@ export default async function PortfolioTimelinePage() {
     projectIds.length > 0
       ? await supabase
           .from("tasks")
-          .select("id, project_id, name, start_date, due_date, status, is_milestone, is_payment_milestone")
+          .select("id, project_id, parent_task_id, name, start_date, due_date, status, progress_percent, is_milestone, is_payment_milestone")
           .in("project_id", projectIds)
       : { data: [] };
 

@@ -4,6 +4,10 @@ import { UsersManager } from "@/components/admin/users-manager";
 export default async function AdminUsersPage() {
   const supabase = await createClient();
 
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+
   const { data: users } = await supabase
     .from("users")
     .select("id, employee_code, name, email, role, is_active")
@@ -21,10 +25,10 @@ export default async function AdminUsersPage() {
 
   return (
     <UsersManager
+      currentUserId={currentUser?.id ?? ""}
       initialUsers={users ?? []}
       types={types ?? []}
       initialAssignments={assignments ?? []}
     />
   );
 }
-

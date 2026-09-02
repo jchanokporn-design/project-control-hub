@@ -4,9 +4,10 @@ import { clsx } from "@/lib/utils";
 const TONE_CLASSES = {
   green: "bg-emerald-100 text-emerald-700",
   yellow: "bg-amber-100 text-amber-700",
-  red: "bg-red-100 text-red-700",
+  red: "bg-rose-100 text-rose-700",
   gray: "bg-slate-100 text-slate-600",
   blue: "bg-blue-100 text-blue-700",
+  dark: "bg-slate-800 text-slate-100",
 } as const;
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
@@ -39,7 +40,7 @@ export const TASK_STATUS_TONE: Record<string, keyof typeof TONE_CLASSES> = {
   in_progress: "blue",
   blocked: "red",
   completed: "green",
-  cancelled: "gray",
+  cancelled: "dark",
 };
 
 export const PROJECT_HEALTH_LABEL: Record<string, string> = {
