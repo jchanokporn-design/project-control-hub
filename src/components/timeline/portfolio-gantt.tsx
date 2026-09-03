@@ -119,6 +119,25 @@ export function PortfolioGantt({
     tasks.forEach((t) => {
       (m[t.project_id] ??= []).push(t);
     });
+
+    // Sort tasks in each project by start_date ascending (earliest to latest, nulls last)
+    Object.keys(m).forEach((pid) => {
+      m[pid].sort((a, b) => {
+        if (a.start_date && b.start_date) {
+          if (a.start_date !== b.start_date) {
+            return a.start_date.localeCompare(b.start_date);
+          }
+          if (a.due_date && b.due_date) {
+            return a.due_date.localeCompare(b.due_date);
+          }
+          return a.name.localeCompare(b.name);
+        }
+        if (a.start_date) return -1;
+        if (b.start_date) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    });
+
     return m;
   }, [tasks]);
 

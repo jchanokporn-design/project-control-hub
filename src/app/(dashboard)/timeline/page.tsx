@@ -32,6 +32,7 @@ export default async function PortfolioTimelinePage() {
           .from("tasks")
           .select("id, project_id, parent_task_id, name, start_date, due_date, status, progress_percent, is_milestone, is_payment_milestone")
           .in("project_id", projectIds)
+          .order("start_date", { ascending: true, nullsFirst: false })
       : { data: [] };
 
   return (
